@@ -19,13 +19,11 @@ from transformers import (
 )
 
 
-# --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESSED_DATA_PATH = os.path.join(BASE_DIR, "../data/processed")
 MODELS_PATH = os.path.join(BASE_DIR, "../models")
 INPUT_FILE = os.path.join(PROCESSED_DATA_PATH, "humaid_cleaned.csv")
 
-# Stronger backbone than DistilBERT for better classification quality.
 MODEL_NAME = os.getenv("TRANSFORMER_MODEL", "roberta-base")
 MAX_LENGTH = int(os.getenv("MAX_TOKEN_LENGTH", "128"))
 EPOCHS = int(os.getenv("TRAIN_EPOCHS", "5"))
@@ -112,13 +110,11 @@ def main():
         df = df.sample(n=SAMPLE_SIZE, random_state=SEED)
         print(f"Using sampled rows: {len(df)}")
 
-    # Label encoding for transformer training.
     classes = sorted(df["label"].unique().tolist())
     label2id = {label: idx for idx, label in enumerate(classes)}
     id2label = {idx: label for label, idx in label2id.items()}
     df["label"] = df["label"].map(label2id)
 
-    # Train / validation / test split with stratification.
     train_df, test_df = train_test_split(df, test_size=0.15, random_state=SEED, stratify=df["label"])
     train_df, val_df = train_test_split(
         train_df,
@@ -150,7 +146,6 @@ def main():
     val_ds.set_format(type="torch", columns=columns)
     test_ds.set_format(type="torch", columns=columns)
 
-    # Compute class weights to reduce majority-class bias.
     class_weights = compute_class_weight(
         class_weight="balanced",
         classes=np.array(sorted(train_df["label"].unique())),

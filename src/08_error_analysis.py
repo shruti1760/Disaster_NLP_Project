@@ -3,22 +3,19 @@ import pickle
 import os
 from sklearn.model_selection import train_test_split
 
-# --- CONFIGURATION ---
 PROCESSED_DATA_PATH = "E:\\3rd_year\\6SEM\\Project\\Disaster_NLP_Project\\data\\processed"
 MODELS_PATH = "E:\\3rd_year\\6SEM\\Project\\Disaster_NLP_Project\\models"
 
 # --- 1. LOAD DATA & MODEL ---
 print("Loading data and model for Error Analysis...")
-# Load the original text so we can read the actual tweets
+
 df_humaid = pd.read_csv(os.path.join(PROCESSED_DATA_PATH, "humaid_cleaned.csv")).dropna(subset=['cleaned_text'])
 
-# We use the exact same random_state=42 to guarantee we get the exact same test set back!
 X_train_text, X_test_text, y_train, y_test = train_test_split(
     df_humaid['cleaned_text'], df_humaid['urgency'], 
     test_size=0.2, random_state=42, stratify=df_humaid['urgency']
 )
 
-# Load the test features and the trained model
 with open(os.path.join(PROCESSED_DATA_PATH, "X_test_tfidf.pkl"), "rb") as f:
     X_test_tfidf = pickle.load(f)
 with open(os.path.join(MODELS_PATH, "logistic_regression_model.pkl"), "rb") as f:
@@ -30,14 +27,12 @@ y_pred = model.predict(X_test_tfidf)
 
 # --- 3. FIND THE MISTAKES ---
 print("Isolating misclassifications...")
-# Create a DataFrame to compare everything side-by-side
 results_df = pd.DataFrame({
     'Tweet_Text': X_test_text,
     'Actual_Urgency': y_test,
     'Predicted_Urgency': y_pred
 })
 
-# Filter the DataFrame to only keep rows where the AI guessed wrong
 errors_df = results_df[results_df['Actual_Urgency'] != results_df['Predicted_Urgency']]
 
 # Specifically isolate the most dangerous errors: Actual High, Predicted Low

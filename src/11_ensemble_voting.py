@@ -10,17 +10,15 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-# --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESSED_DATA_PATH = os.path.join(BASE_DIR, "../data/processed")
 MODELS_PATH = os.path.join(BASE_DIR, "../models")
 
-# Define the paths to your 3 different brains
 ROBERTA_DIR = os.path.join(MODELS_PATH, "roberta_urgency_classifier")
 CNN_MODEL_PATH = os.path.join(MODELS_PATH, "hybrid_cnn_bilstm.h5")
 CNN_TOKENIZER_PATH = os.path.join(MODELS_PATH, "dl_tokenizer.pkl")
-LOGREG_MODEL_PATH = os.path.join(MODELS_PATH, "logistic_regression_model.pkl") # Update if your Phase 1 name is different
-TFIDF_PATH = os.path.join(MODELS_PATH, "tfidf_vectorizer.pkl")    # Update if your Phase 1 name is different
+LOGREG_MODEL_PATH = os.path.join(MODELS_PATH, "logistic_regression_model.pkl")
+TFIDF_PATH = os.path.join(MODELS_PATH, "tfidf_vectorizer.pkl")  
 
 print("🚀 Initializing the Ensemble 'Meta-Model'...")
 
@@ -28,7 +26,6 @@ print("🚀 Initializing the Ensemble 'Meta-Model'...")
 print("Loading the test dataset...")
 df = pd.read_csv(os.path.join(PROCESSED_DATA_PATH, "humaid_cleaned.csv")).dropna(subset=['cleaned_text', 'urgency'])
 
-# Recreate the EXACT same test split you used in your previous scripts
 X = df['cleaned_text'].astype(str).tolist()
 y = df['urgency'].tolist()
 
@@ -36,7 +33,6 @@ label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 _, X_test, _, y_test = train_test_split(X, y_encoded, test_size=0.15, random_state=42, stratify=y_encoded)
 
-# Prepare an array to hold the probabilities from each model
 ensemble_probs = np.zeros((len(X_test), 3))
 active_models = 0
 
@@ -58,7 +54,7 @@ if os.path.exists(ROBERTA_DIR):
             batch_texts = X_test[i:i+batch_size]
             inputs = tokenizer_rob(batch_texts, truncation=True, padding=True, max_length=128, return_tensors="pt").to(device)
             outputs = model_rob(**inputs)
-            # Convert logits to probabilities using Softmax
+
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1).cpu().numpy()
             rob_probs.extend(probs)
             
@@ -76,7 +72,7 @@ if os.path.exists(CNN_MODEL_PATH) and os.path.exists(CNN_TOKENIZER_PATH):
     
     print("Gathering CNN-BiLSTM's predictions...")
     X_test_seq = tokenizer_cnn.texts_to_sequences(X_test)
-    X_test_pad = pad_sequences(X_test_seq, maxlen=50) # Must match the maxlen from script 09
+    X_test_pad = pad_sequences(X_test_seq, maxlen=50) 
     
     cnn_probs = model_cnn.predict(X_test_pad, verbose=0)
     ensemble_probs += cnn_probs * 0.25
@@ -108,10 +104,8 @@ if active_models == 0:
 
 print(f"\n✅ Aggregated votes from {active_models} models.")
 
-# Normalize probabilities if some models were missing
 ensemble_probs = ensemble_probs / np.sum(ensemble_probs, axis=1, keepdims=True)
 
-# The final prediction is the class with the highest combined probability
 y_pred_ensemble = np.argmax(ensemble_probs, axis=1)
 
 print("\n" + "="*50)
@@ -119,6 +113,6 @@ print(f"🏆 ENSEMBLE MODEL ACCURACY: {accuracy_score(y_test, y_pred_ensemble):.
 print("="*50)
 
 print("\n--- Detailed Classification Report ---")
-# Get original class names
+
 classes = sorted(list(set(y)))
 print(classification_report(y_test, y_pred_ensemble, target_names=classes))

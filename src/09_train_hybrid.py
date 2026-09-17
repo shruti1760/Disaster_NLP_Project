@@ -13,11 +13,10 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, Conv1D, MaxPooling1D, Bidirectional, LSTM, Dense, Dropout
 from gensim.models import Word2Vec
 
-# --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESSED_DATA_PATH = os.path.join(BASE_DIR, "../data/processed/")
 MODELS_PATH = os.path.join(BASE_DIR, "../models/")
-MAX_SEQUENCE_LENGTH = 50 # Max words per tweet
+MAX_SEQUENCE_LENGTH = 50
 
 print("Loading data and Word2Vec dictionary...")
 df = pd.read_csv(os.path.join(PROCESSED_DATA_PATH, "humaid_cleaned.csv")).dropna(subset=['cleaned_text'])
@@ -28,52 +27,44 @@ print("Tokenizing and padding sequences...")
 X = df['cleaned_text'].astype(str).tolist()
 y = df['urgency'].tolist()
 
-# Encode labels (High=0, Low=1, Medium=2)
 label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 
-# Split data
 X_train_text, X_test_text, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded)
 
-# Tokenize text for Neural Network
 tokenizer = Tokenizer()
 tokenizer.fit_on_texts(X_train_text)
 vocab_size = len(tokenizer.word_index) + 1
 
-# Pad sequences so every tweet is exactly 50 words long
 X_train_pad = pad_sequences(tokenizer.texts_to_sequences(X_train_text), maxlen=MAX_SEQUENCE_LENGTH)
 X_test_pad = pad_sequences(tokenizer.texts_to_sequences(X_test_text), maxlen=MAX_SEQUENCE_LENGTH)
 
 # --- 2. CREATE EMBEDDING MATRIX ---
 print("Mapping Word2Vec vectors to Neural Network weights...")
-embedding_matrix = np.zeros((vocab_size, 100)) # 100 is the vector_size from our Word2Vec model
+embedding_matrix = np.zeros((vocab_size, 100)) 
 for word, i in tokenizer.word_index.items():
     if word in w2v_model.wv:
         embedding_matrix[i] = w2v_model.wv[word]
 
 # --- 3. CLASS WEIGHTS (Fixing Imbalance) ---
-# Deep Learning handles imbalance better with weights than SMOTE
 class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
 class_weight_dict = dict(enumerate(class_weights))
 
 # --- 4. BUILD THE HYBRID CNN-BiLSTM MODEL ---
 print("\nConstructing Hybrid CNN-BiLSTM Architecture...")
 model = Sequential([
-    # Layer 1: The AI Dictionary (Frozen weights from Word2Vec)
+    
     Embedding(input_dim=vocab_size, output_dim=100, weights=[embedding_matrix], 
               input_length=MAX_SEQUENCE_LENGTH, trainable=False),
     
-    # Layer 2: The Keyword Sniper (CNN)
     Conv1D(filters=64, kernel_size=3, activation='relu'),
     MaxPooling1D(pool_size=2),
-    
-    # Layer 3: The Context Reader (BiLSTM)
+
     Bidirectional(LSTM(64, return_sequences=False)),
-    Dropout(0.5), # Prevents overfitting
+    Dropout(0.5), 
     
-    # Layer 4: The Decision Maker
     Dense(32, activation='relu'),
-    Dense(3, activation='softmax') # 3 output nodes for High, Medium, Low
+    Dense(3, activation='softmax') 
 ])
 
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
@@ -94,7 +85,6 @@ print("\n--- Detailed Classification Report ---")
 target_names = label_encoder.inverse_transform([0, 1, 2])
 print(classification_report(y_test, y_pred, target_names=target_names))
 
-# Save artifacts
 model.save(os.path.join(MODELS_PATH, "hybrid_cnn_bilstm.h5"))
 with open(os.path.join(MODELS_PATH, "dl_tokenizer.pkl"), "wb") as f:
     pickle.dump(tokenizer, f)

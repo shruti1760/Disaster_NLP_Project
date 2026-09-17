@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from lime.lime_text import LimeTextExplainer
 
-# --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROCESSED_DATA_PATH = os.path.join(BASE_DIR, "../data/processed/")
 MODELS_PATH = os.path.join(BASE_DIR, "../models/")
@@ -27,7 +26,6 @@ label_encoder = LabelEncoder()
 y_encoded = label_encoder.fit_transform(y)
 classes = label_encoder.classes_
 
-# Exact same split as training to ensure we are testing unseen data
 _, X_test, _, y_test = train_test_split(X, y_encoded, test_size=0.15, random_state=42, stratify=y_encoded)
 
 # --- 2. LOAD ROBERTA ---
@@ -39,12 +37,10 @@ model.to(device)
 model.eval()
 
 # --- 3. LIME PREDICTION FUNCTION ---
-# LIME needs a specific function that takes raw text and returns probabilities
 def predictor_wrapper(texts):
     inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=128).to(device)
     with torch.no_grad():
         outputs = model(**inputs)
-    # Convert logits to probabilities
     probs = F.softmax(outputs.logits, dim=1).cpu().numpy()
     return probs
 
@@ -53,7 +49,6 @@ print("Hunting for a tweet where RoBERTa confused 'High' and 'Medium' urgency...
 test_subset = X_test
 true_subset = y_test
 
-# Process the predictions in memory-safe batches of 32 to prevent CUDA OOM
 batch_size = 32
 subset_probs = []
 

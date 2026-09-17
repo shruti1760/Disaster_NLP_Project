@@ -21,7 +21,6 @@ except FileNotFoundError:
 
 # --- 1. PREPARE TEXT FOR WORD2VEC ---
 print("\nTokenizing sentences (breaking tweets into individual words)...")
-# Word2Vec requires a list of lists: [['the', 'bridge', 'collapsed'], ['send', 'help', 'now']]
 sentences = [str(text).split() for text in df['cleaned_text']]
 
 # --- 2. TRAIN THE WORD2VEC MODEL ---
